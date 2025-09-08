@@ -143,6 +143,10 @@ impl CliCommand<String> for Build {
                 }
             }
 
+            if package_address.is_some() {
+                println!("Note: Using existing package address {} for package {}", package_address.unwrap(), pkg_name);
+            }
+
             let json = make_publish_payload_json(
                 method,
                 env.config().yeaptor_address,
