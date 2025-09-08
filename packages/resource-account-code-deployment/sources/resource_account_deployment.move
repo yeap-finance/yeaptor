@@ -20,11 +20,38 @@ module ra_code_deployment::ra_code_deployment {
     use aptos_framework::account;
     use aptos_framework::account::{SignerCapability, create_resource_address};
     use aptos_framework::code;
+    use aptos_framework::resource_account;
     use aptos_extensions::manageable;
 
     /// Capability to create a signer for the resource account in order to upgrade code.
     struct PublishPackageCap has key {
         cap: SignerCapability
+    }
+
+    /// Module initializer invoked when this module is published under a resource (package) account.
+    ///
+    /// Prerequisites
+    /// - This module must be published from a resource account associated with `@ra_code_deployment_deployer`.
+    ///
+    /// What it does
+    /// - Retrieves the resource account capability bound to `@ra_code_deployment_deployer`.
+    /// - Stores `PublishPackageCap` under the resource (package) account so this module can later sign publishes/upgrades.
+    /// - Initializes a manageable admin resource with `@ra_code_deployment_deployer` as the initial admin.
+    ///
+    /// Effects
+    /// - After publish, the package account contains `PublishPackageCap` and a manageable admin resource.
+    ///
+    /// Aborts
+    /// - If the capability cannot be retrieved for the given deployer.
+    /// - If `PublishPackageCap` already exists at the account (due to `move_to`).
+    ///
+    /// Note
+    /// - This initializer is for deploying this module itself. End users deploying their own packages should
+    ///   call `create_package_account`/`deploy` instead.
+    fun init_module(resource_signer: &signer) {
+        let signer_cap = resource_account::retrieve_resource_account_cap(resource_signer,@ra_code_deployment_deployer);
+        move_to(resource_signer, PublishPackageCap { cap: signer_cap });
+        manageable::new(resource_signer, @ra_code_deployment_deployer);
     }
 
     /// Domain-separate the input seed to avoid collisions with other modules using the same seed.
