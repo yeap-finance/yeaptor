@@ -7,9 +7,11 @@ license = "Apache-2.0"
 [addresses]
 
 ra_code_deployment = "_"
+ra_code_deployment_deployer = "_"
 
 [dev-addresses]
 ra_code_deployment = "0x42"
+ra_code_deployment_deployer = "0x43"
 
 aptos_extensions = "0x12"
 aptos_extensions_deployer = "0x13"

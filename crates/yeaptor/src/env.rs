@@ -9,17 +9,19 @@ use std::collections::BTreeMap;
 
 use std::path::Path;
 use aptos_framework::docgen::DocgenOptions;
+use move_binary_format::access::ModuleAccess;
 
 #[derive(Debug, Clone)]
 pub struct YeaptorEnv {
     config: YeaptorConfig,
     named_addresses: BTreeMap<String, AccountAddress>,
+    package_addresses: BTreeMap<String, AccountAddress>,
 }
 pub struct BuiltDeployment {
     #[allow(unused)]
     pub publisher: AccountAddress,
     pub seed: String,
-
+    pub package_address: Option<AccountAddress>,
     pub pack: BuiltPackage, // (package_name, metadata_serialized, modules)
 }
 
@@ -31,7 +33,7 @@ fn domain_separated_seed(ra_address: &AccountAddress, mut seed: Vec<u8>) -> Vec<
 }
 impl YeaptorEnv {
     pub fn new(config: YeaptorConfig) -> Self {
-        let mut named_addresses: BTreeMap<_, _> = config.named_addresses.clone();
+
         let package_addresses = config
             .deployments
             .iter()
@@ -49,11 +51,13 @@ impl YeaptorEnv {
                     .map(move |package| (package.address_name.clone(), deployment_address.clone()))
             })
             .collect::<BTreeMap<String, AccountAddress>>();
-        named_addresses.extend(package_addresses);
+        // if user overrides package addresses in named addresses config, use those in preference
+        let named_addresses: BTreeMap<_, _> = config.named_addresses.clone();
 
         Self {
             config,
             named_addresses,
+            package_addresses,
         }
     }
     pub fn config(&self) -> &YeaptorConfig {
@@ -92,6 +96,10 @@ impl YeaptorEnv {
         &self.named_addresses
     }
 
+    pub fn is_package_address_overridden(&self, package_name: &str) -> bool {
+        self.named_addresses.contains_key(package_name)
+    }
+
     pub fn build_all(
         &self,
         included_args: &IncludedArtifactsArgs,
@@ -120,7 +128,15 @@ impl YeaptorEnv {
                     .build_package(pkg_path, included_artifacts, move_options, docgen_options.clone())
                     .expect("Failed to build package");
 
+                let existing_package_address = if self.is_package_address_overridden(pkg.address_name.as_str()) {
+                    let package_address = pack.modules().map(|m| m.address()).next().unwrap();
+                    assert!(self.named_addresses.get(pkg.address_name.as_str()).unwrap() == package_address);
+                    Some(*package_address)
+                } else {
+                    None
+                };
                 let d = BuiltDeployment {
+                    package_address: existing_package_address,
                     publisher: publisher.clone(),
                     seed: seed.clone(),
                     pack,
@@ -140,7 +156,10 @@ impl YeaptorEnv {
     ) -> CliTypedResult<BuiltPackage> {
         let mut build_options = included_args.build_options(move_options)?;
         build_options.install_dir = move_options.output_dir.clone();
-        let mut named_addresses = self.named_addresses.clone();
+
+        // Merge named addresses: package addresses < env named addresses < user named addresses
+        let mut named_addresses = self.package_addresses.clone();
+        named_addresses.extend(self.named_addresses.clone());
         named_addresses.extend(build_options.named_addresses.clone());
         build_options.named_addresses = named_addresses;
         build_options.with_docs = docgen_options.is_some();
@@ -187,7 +206,15 @@ impl YeaptorEnv {
                         move_options,
                         doc_options,
                     )?;
+                    let package_address = built_package.modules().map(|m| m.address()).next().unwrap();
+                    let existing_package_address = if self.is_package_address_overridden(pkg.address_name.as_str()) {
+                        assert!(self.named_addresses.get(pkg.address_name.as_str()).unwrap() == package_address);
+                        Some(*package_address)
+                    } else {
+                        None
+                    };
                     let deployment = BuiltDeployment {
+                        package_address: existing_package_address,
                         publisher: self
                             .config
                             .publishers

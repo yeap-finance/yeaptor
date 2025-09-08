@@ -6,12 +6,12 @@ use aptos::common::types::{
     CliCommand, CliError, CliResult, CliTypedResult, MovePackageOptions, PromptOptions, SaveFile,
 };
 use aptos::move_tool::IncludedArtifactsArgs;
+use aptos_framework::docgen::DocgenOptions;
 use aptos_types::account_address::AccountAddress;
 use clap::{Parser, Subcommand};
 use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
-use aptos_framework::docgen::DocgenOptions;
 
 #[derive(Subcommand)]
 /// Build publish payload JSON files and optionally event definition files from yeaptor.toml deployments
@@ -80,11 +80,15 @@ impl CliCommand<String> for Build {
             vec![built_deployment]
         } else {
             // Build all deployments as before
-            env.build_all(&self.included_artifacts_args, &self.move_options, self.doc_options.clone())
-                .with_context(|| "failed to build all deployments")?
-                .into_iter()
-                .enumerate()
-                .collect::<Vec<_>>()
+            env.build_all(
+                &self.included_artifacts_args,
+                &self.move_options,
+                self.doc_options.clone(),
+            )
+            .with_context(|| "failed to build all deployments")?
+            .into_iter()
+            .enumerate()
+            .collect::<Vec<_>>()
         };
 
         fs::create_dir_all(&self.out_dir).with_context(|| {
@@ -102,6 +106,7 @@ impl CliCommand<String> for Build {
         }
         for (i, deployment) in built_deployments {
             let BuiltDeployment {
+                package_address,
                 publisher: _,
                 seed,
                 pack,
@@ -139,6 +144,7 @@ impl CliCommand<String> for Build {
 
             let json = make_publish_payload_json(
                 env.config().yeaptor_address,
+                package_address,
                 seed.as_str(),
                 &metadata_serialized,
                 &modules,
@@ -202,6 +208,7 @@ impl CliCommand<String> for Build {
 
 fn make_publish_payload_json(
     ra_code_deployment_address: AccountAddress,
+    existing_package_address: Option<AccountAddress>,
     seed: &str,
     metadata: &[u8],
     modules: &[Vec<u8>],
@@ -212,13 +219,25 @@ fn make_publish_payload_json(
         .iter()
         .map(|m| format!("0x{}", hex::encode(m)))
         .collect();
-    json!({
-        "function_id": format!("{}::{}::{}", ra_code_deployment_address.to_standard_string(), "ra_code_deployment", "deploy"),
-        "type_args": [],
-        "args": [
-            { "type": "hex", "value": seed_hex },
-            { "type": "hex", "value": meta_hex },
-            { "type": "hex", "value": module_hex },
-        ]
-    })
+    if let Some(addr) = existing_package_address {
+        json!({
+            "function_id": format!("{}::{}::{}", ra_code_deployment_address.to_standard_string(), "ra_code_deployment", "publish"),
+            "type_args": [],
+            "args": [
+                { "type": "hex", "value": meta_hex },
+                { "type": "hex", "value": module_hex },
+                { "type": "address", "value": addr.to_standard_string() },
+            ]
+        })
+    } else {
+        json!({
+            "function_id": format!("{}::{}::{}", ra_code_deployment_address.to_standard_string(), "ra_code_deployment", "deploy"),
+            "type_args": [],
+            "args": [
+                { "type": "hex", "value": seed_hex },
+                { "type": "hex", "value": meta_hex },
+                { "type": "hex", "value": module_hex },
+            ]
+        })
+    }
 }
