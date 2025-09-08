@@ -1,0 +1,5 @@
+[addresses]
+aptos_extensions = "0x98bce69c31ee2cf91ac50a3f38db7b422e3df7cdde9fe672ee1d03538a6aeae0"
+aptos_extensions_deployer = "0x98bce69c31ee2cf91ac50a3f38db7b422e3df7cdde9fe672ee1d03538a6aeae0"
+ra_code_deployment = "0xdf3728b33bf766ce6a2d2def9588c5e9311d574075f1b2fecfdceb672630f2df"
+ra_code_deployment_deployer = "0x028b7f9f45e3c2846c67e52656e68eca2b5427e347cbb6b84babe2cbfb4dd671"
