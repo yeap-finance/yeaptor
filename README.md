@@ -1,14 +1,14 @@
 # Yeaptor
 
-Yeaptor provides a small CLI and a Move package that make deterministic, admin‑gated deployments of Move code to Aptos resource accounts straightforward and repeatable.
+Yeaptor provides a small CLI and a Move package that make deterministic, admin‑gated deployments of Move code to Aptos resource ("package") accounts straightforward and repeatable.
 
 Core focus in this repository:
 - crates/yeaptor — a CLI that turns a declarative `yeaptor.toml` plan into ready‑to‑run Aptos entry‑function JSON payloads.
-- packages/resource-account-code-deployment — a Move module that deploys/upgrades packages to resource accounts derived from (publisher, seed), with admin control and optional freeze.
+- packages/resource-account-code-deployment — a Move module that deploys/upgrades packages to package accounts derived from (publisher, seed), with admin control and optional freeze.
 
 ## Highlights
-- Deterministic resource account addresses from (publisher, seed)
-- One‑shot or batch publish/upgrade via entry functions
+- Deterministic package account addresses from (publisher, seed) with domain‑separated seeds
+- One‑shot publish/upgrade via entry functions
 - Admin‑gated operations using aptos_extensions::manageable
 - Optional freeze to lock code and revoke management
 - Simple, declarative CLI workflow that outputs JSON payloads for `aptos move run`
@@ -21,8 +21,8 @@ Core focus in this repository:
   - `packages/proxy-account`
 
 ## How it works
-- You describe deployments in `yeaptor.toml` using logical publisher aliases, a seed, and a list of packages to deploy under the same resource account.
-- The CLI computes the resource account address for each deployment via `create_resource_address(publisher, seed)`.
+- You describe deployments in `yeaptor.toml` using logical publisher aliases, a seed, and a list of packages to deploy under the same package account.
+- The CLI computes the package account address for each deployment via the module’s `create_package_address(publisher, seed)` function (domain‑separated).
 - During build, the CLI injects named addresses so each package’s `address_name` resolves to that resource account address.
 - For each package, the CLI emits a JSON payload calling `<yeaptor_address>::ra_code_deployment::deploy(seed, metadata, modules)`.
 - You submit the JSON payloads in order with Aptos CLI.
@@ -101,7 +101,7 @@ Generated outputs
 
 Notes
 - Order matters: deployments and the packages within them are processed sequentially.
-- `seed` must be UTF‑8 text (not hex) to ensure consistent resource address derivation.
+- `seed` must be UTF‑8 text (not hex). The module applies domain separation internally for deterministic address derivation.
 - `address_name` must match the named address used in the package’s `Move.toml`.
 - `yeaptor_address` must be the on‑chain address hosting the `ra_code_deployment` module.
 
@@ -152,30 +152,27 @@ Generate, don’t run, a processor configuration YAML that can be used by a no�
   - This doesn’t run an indexer; it only produces the config for downstream use.
 
 ## Move module: ra_code_deployment::ra_code_deployment
-Deterministic deployment and upgrade of Move packages to resource accounts using a publisher‑provided seed.
+Deterministic deployment and upgrade of Move packages to package accounts using a publisher‑provided seed (with domain‑separated seeds).
 
 Concepts
-- Deterministic address: `create_resource_address(publisher, seed)`.
+- Deterministic address (domain‑separated): `create_package_address(publisher, seed)`.
 - Admin model: Uses `aptos_extensions::manageable` to gate publish/upgrade to admins.
-- Capability storage: `PublishPackageCap` (stored under the resource account) holds the `SignerCapability` to sign upgrades.
+- Capability storage: `PublishPackageCap` (stored under the package account) holds the `SignerCapability` to sign upgrades.
 
-Public entry functions
-- create_resource_account(publisher: &signer, seed: vector<u8>)
-  - Creates the resource account derived from `(publisher, seed)`; aborts if it already exists.
-  - Stores `PublishPackageCap` and initializes manageable admin with `publisher` as admin.
-- deploy(publisher: &signer, seed: vector<u8>, metadata_serialized: vector<u8>, code: vector<vector<u8>>)` acquires PublishPackageCap
-  - Ensures the resource account exists, then publishes the package to that resource account (upgrade if already published).
-- batch_deploy(publisher: &signer, seed: vector<u8>, metadatas: vector<vector<u8>>, packages: vector<vector<vector<u8>>>)` acquires PublishPackageCap
-  - Ensures the resource account exists, then publishes multiple packages in order.
-- publish(admin: &signer, metadata_serialized: vector<u8>, code: vector<vector<u8>>, resource_address: address)` acquires PublishPackageCap
-  - Requires `admin` to be a manageable admin for `resource_address`. Publishes/upgrades using the stored capability.
-- batch_publish(admin: &signer, resource_address: address, metadatas: vector<vector<u8>>, packages: vector<vector<vector<u8>>>)` acquires PublishPackageCap
-  - Admin‑gated batch publish to an existing resource account.
-- freeze_resource_account(admin: &signer, resource_address: address)` acquires PublishPackageCap
+Public API
+- `#[view] create_package_address(publisher: address, seed: vector<u8>): address`
+  - Deterministically derives the package account address from `(publisher, seed)` with domain separation.
+- `entry fun create_package_account(publisher: &signer, seed: vector<u8>)`
+  - Creates the package account; stores `PublishPackageCap` and initializes manageable admin with `publisher` as admin.
+- `entry fun deploy(publisher: &signer, seed: vector<u8>, metadata_serialized: vector<u8>, code: vector<vector<u8>>)` acquires `PublishPackageCap`
+  - Ensures the package account exists, then publishes the package to that account (upgrade if already published).
+- `entry fun publish(admin: &signer, metadata_serialized: vector<u8>, code: vector<vector<u8>>, resource_address: address)` acquires `PublishPackageCap`
+  - Requires admin; publishes/upgrades using the stored capability.
+- `entry fun freeze_package_account(admin: &signer, resource_address: address)` acquires `PublishPackageCap`
   - Admin‑gated. Revokes management and removes the stored capability to prevent further publishes/upgrades.
 
-Storage under the resource account
-- PublishPackageCap { cap: SignerCapability }
+Storage under the package account
+- `PublishPackageCap { cap: SignerCapability }`
 - Manageable admin resource (via `aptos_extensions::manageable`)
 
 ## Typical use cases
