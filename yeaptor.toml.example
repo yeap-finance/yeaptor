@@ -16,6 +16,9 @@
 # Deployment fields:
 # - publisher: Publisher alias or on-chain address
 # - seed: UTF-8 seed for resource account derivation
+# - method: Deployment method for resource account code ops ("yeap" | "standard"), defaults to "yeap"
+#           * yeap: use Yeap enhanced resource account pattern (preferred)
+#           * standard: use standard Aptos resource account deployment flow
 # - packages: Array of packages to deploy
 #
 # Package fields:
@@ -33,7 +36,7 @@ yeap-multisig = "0x10"
 # dependencies addresses
 
 
-# Deployment 1: core stack (sequential mode - default)
+# Deployment 1: core stack (implicit method = "yeap")
 [[deployments]]
 # Provide seed as UTF-8 text or hex (0x...).
 publisher = "yeap-multisig"
@@ -46,10 +49,11 @@ packages = [
     { address_name = "proxy_account", path = "packages/proxy-account", include_artifacts = "sparse" },
 ]
 
-# Deployment 2: payments stack (batch mode enabled)
+# Deployment 2: payments stack using standard method
 [[deployments]]
 publisher = "yeap-multisig"
 seed = "payments-v1"
+method = "standard"
 packages = [
     # Example with explicit include_artifacts = "all"
     # { address_name = "payments", path = "packages/payments", include_artifacts = "all" },
