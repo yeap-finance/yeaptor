@@ -1,4 +1,4 @@
-use crate::config::YeaptorConfig;
+use crate::config::{DeployMethod, YeaptorConfig};
 use anyhow::anyhow;
 
 use aptos::common::types::{CliError, CliTypedResult, MovePackageOptions};
@@ -18,6 +18,7 @@ pub struct YeaptorEnv {
     package_addresses: BTreeMap<String, AccountAddress>,
 }
 pub struct BuiltDeployment {
+    pub method: DeployMethod,
     #[allow(unused)]
     pub publisher: AccountAddress,
     pub seed: String,
@@ -38,13 +39,21 @@ impl YeaptorEnv {
             .deployments
             .iter()
             .flat_map(|de| {
+                let seed = match de.method {
+                    DeployMethod::YeapResourceAccount => {
+                        domain_separated_seed(&config.yeaptor_address, de.seed.as_bytes().to_vec())
+                    }
+                    DeployMethod::StandardResourceAccount => {
+                        de.seed.as_bytes().to_vec()
+                    }
+                };
                 let deployment_address = create_resource_address(
                     config
                         .publishers
                         .get(de.publisher.as_str())
                         .unwrap()
                         .clone(),
-                    &domain_separated_seed(&config.yeaptor_address, de.seed.as_bytes().to_vec()),
+                    &seed,
                 );
                 de.packages
                     .iter()
@@ -91,9 +100,11 @@ impl YeaptorEnv {
         }
         Ok(None)
     }
-    #[allow(unused)]
-    pub fn named_addresses(&self) -> &BTreeMap<String, AccountAddress> {
-        &self.named_addresses
+
+    pub fn all_addresses(&self) -> BTreeMap<String, AccountAddress> {
+        let mut all = self.package_addresses.clone();
+        all.extend(self.named_addresses.clone());
+        all
     }
 
     pub fn is_package_address_overridden(&self, package_name: &str) -> bool {
@@ -136,6 +147,7 @@ impl YeaptorEnv {
                     None
                 };
                 let d = BuiltDeployment {
+                    method: deployment.method.clone(),
                     package_address: existing_package_address,
                     publisher: publisher.clone(),
                     seed: seed.clone(),
@@ -214,6 +226,7 @@ impl YeaptorEnv {
                         None
                     };
                     let deployment = BuiltDeployment {
+                        method: deployment.method.clone(),
                         package_address: existing_package_address,
                         publisher: self
                             .config

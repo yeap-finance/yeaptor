@@ -1,4 +1,4 @@
-use crate::config::load_config;
+use crate::config::{DeployMethod, load_config};
 use crate::env::{BuiltDeployment, YeaptorEnv};
 use crate::tools::event::build_event_definition;
 use anyhow::Context;
@@ -110,6 +110,7 @@ impl CliCommand<String> for Build {
                 publisher: _,
                 seed,
                 pack,
+                method,
             } = deployment;
 
             let (pkg_name, metadata_serialized, modules) = {
@@ -143,12 +144,13 @@ impl CliCommand<String> for Build {
             }
 
             let json = make_publish_payload_json(
+                method,
                 env.config().yeaptor_address,
                 package_address,
                 seed.as_str(),
                 &metadata_serialized,
                 &modules,
-            );
+            )?;
             let out_path = self
                 .out_dir
                 .join(format!("{}-{}.package.json", i, pkg_name));
@@ -169,7 +171,7 @@ impl CliCommand<String> for Build {
         // Write resolved named addresses to a TOML file at the end
         let addresses_path = self.out_dir.join("addresses.toml");
         let mut addresses_toml = String::from("[addresses]\n");
-        for (name, addr) in env.named_addresses().iter() {
+        for (name, addr) in env.all_addresses().iter() {
             addresses_toml.push_str(&format!("{} = \"{}\"\n", name, addr.to_standard_string()));
         }
         fs::write(&addresses_path, addresses_toml).with_context(|| {
@@ -207,37 +209,63 @@ impl CliCommand<String> for Build {
 // }
 
 fn make_publish_payload_json(
+    method: DeployMethod,
     ra_code_deployment_address: AccountAddress,
     existing_package_address: Option<AccountAddress>,
     seed: &str,
     metadata: &[u8],
     modules: &[Vec<u8>],
-) -> serde_json::Value {
+) -> CliTypedResult<serde_json::Value> {
     let seed_hex = format!("0x{}", hex::encode(seed.as_bytes()));
     let meta_hex = format!("0x{}", hex::encode(metadata));
     let module_hex: Vec<String> = modules
         .iter()
         .map(|m| format!("0x{}", hex::encode(m)))
         .collect();
-    if let Some(addr) = existing_package_address {
-        json!({
-            "function_id": format!("{}::{}::{}", ra_code_deployment_address.to_standard_string(), "ra_code_deployment", "publish"),
-            "type_args": [],
-            "args": [
-                { "type": "hex", "value": meta_hex },
-                { "type": "hex", "value": module_hex },
-                { "type": "address", "value": addr.to_standard_string() },
-            ]
-        })
-    } else {
-        json!({
-            "function_id": format!("{}::{}::{}", ra_code_deployment_address.to_standard_string(), "ra_code_deployment", "deploy"),
-            "type_args": [],
-            "args": [
-                { "type": "hex", "value": seed_hex },
-                { "type": "hex", "value": meta_hex },
-                { "type": "hex", "value": module_hex },
-            ]
-        })
-    }
+    let payload = match (method, existing_package_address) {
+        // initial deployment to a new Yeap resource account
+        (DeployMethod::YeapResourceAccount, None) => {
+            json!({
+                "function_id": format!("{}::{}::{}", ra_code_deployment_address.to_standard_string(), "ra_code_deployment", "deploy"),
+                "type_args": [],
+                "args": [
+                    { "type": "hex", "value": seed_hex },
+                    { "type": "hex", "value": meta_hex },
+                    { "type": "hex", "value": module_hex },
+                ]
+            })
+        }
+        // subsequent deployment to an existing Yeap resource account
+        (DeployMethod::YeapResourceAccount, Some(addr)) => {
+            json!({
+                "function_id": format!("{}::{}::{}", ra_code_deployment_address.to_standard_string(), "ra_code_deployment", "publish"),
+                "type_args": [],
+                "args": [
+                    { "type": "hex", "value": meta_hex },
+                    { "type": "hex", "value": module_hex },
+                    { "type": "address", "value": addr.to_standard_string() },
+                ]
+            })
+        }
+        // initial deployment to a new standard resource account
+        (DeployMethod::StandardResourceAccount, None) => {
+            json!({
+                "function_id": format!("{}::{}::{}", AccountAddress::ONE.to_standard_string(), "resource_account", "create_resource_account_and_publish_package"),
+                "type_args": [],
+                    "args": [
+                        { "type": "hex", "value": seed_hex },
+                        { "type": "hex", "value": meta_hex },
+                        { "type": "hex", "value": module_hex },
+                    ]
+            })
+        }
+        // subsequent deployment to an existing standard resource account is not supported
+        (DeployMethod::StandardResourceAccount, Some(addr)) => {
+            return Err(CliError::CommandArgumentError(format!(
+                "StandardResourceAccount deployment method does not support existing package address {}",
+                addr
+            )));
+        }
+    };
+    Ok(payload)
 }
