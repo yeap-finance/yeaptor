@@ -23,6 +23,12 @@ pub struct BuiltDeployment {
     pub pack: BuiltPackage, // (package_name, metadata_serialized, modules)
 }
 
+fn domain_separated_seed(ra_address: &AccountAddress, mut seed: Vec<u8>) -> Vec<u8> {
+    let mut final_seed = bcs::to_bytes(ra_address).unwrap();
+    final_seed.append(&mut "::ra_code_deployment::".as_bytes().to_vec());
+    final_seed.append(&mut seed);
+    final_seed
+}
 impl YeaptorEnv {
     pub fn new(config: YeaptorConfig) -> Self {
         let mut named_addresses: BTreeMap<_, _> = config.named_addresses.clone();
@@ -36,7 +42,7 @@ impl YeaptorEnv {
                         .get(de.publisher.as_str())
                         .unwrap()
                         .clone(),
-                    de.seed.as_bytes(),
+                    &domain_separated_seed(&config.yeaptor_address, de.seed.as_bytes().to_vec()),
                 );
                 de.packages
                     .iter()
