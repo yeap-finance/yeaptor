@@ -1,0 +1,40 @@
+# Yeaptor deployment configuration (v1)
+#
+# This file declares:
+# - publisher aliases and their on-chain addresses
+# - deployments: an ordered array; each item maps to a single resource account, defined by
+#   (publisher + seed), and contains its own ordered list of packages to deploy. Each package is
+#   an object with { address_name, path }.
+#
+# Ordering:
+# - Deployments: processed in the order they appear in [[deployments]].
+# - Packages: executed in the order they appear in the deployment's packages array. No explicit dependencies.
+#
+# Packages listed under the same deployment are deployed to the same resource account
+# derived from (publisher address, seed).
+
+format_version = 1
+yeaptor_address = "0xa64ff341dc07731e8c28feaa164ef324eb48d65e1a662e38cce4177d288d2e0d"
+[publishers]
+
+# Alias -> on-chain address
+developer = "0x028b7f9f45e3c2846c67e52656e68eca2b5427e347cbb6b84babe2cbfb4dd671"
+
+[named-addresses]
+
+# dependencies addresses
+# Aptos Extensions (Testnet addresses)
+aptos_extensions = "0xd14dc8581a2f3aa09186807179bcd0e0c5138148767b8ea7276427c234bd96cc"
+aptos_extensions_deployer = "0xd14dc8581a2f3aa09186807179bcd0e0c5138148767b8ea7276427c234bd96cc"
+ra_code_deployment_deployer = "0x028b7f9f45e3c2846c67e52656e68eca2b5427e347cbb6b84babe2cbfb4dd671"
+
+# Deployment 1
+[[deployments]]
+# Provide seed as UTF-8 text or hex (0x...).
+publisher = "developer"
+seed = "ra-code-deployment"
+method = "standard"
+packages = [
+  { address_name = "ra_code_deployment", path = "packages/resource-account-code-deployment" },
+]
+# Place entries in desired order; no explicit dependency keywords are supported.
