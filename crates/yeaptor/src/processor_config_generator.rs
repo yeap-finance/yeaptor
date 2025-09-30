@@ -21,7 +21,7 @@ const EVENT_INDEX: &str = "event_index";
 const EVENT_TYPE: &str = "event_type";
 
 const TRANSACTION_METADATA: &str = "transaction_metadata";
-const TRANSACTION_METADATA_FIELDS: &[&str] = &["block_height", "epoch", "timestamp", "version"];
+const TRANSACTION_METADATA_FIELDS: &[&str] = &["block_height", "epoch", "timestamp", "version", "hash"];
 pub fn load_event_definitions_from_dir(dir: &Path) -> anyhow::Result<Vec<EventDefinition>> {
     let mut out: Vec<EventDefinition> = Vec::new();
     for entry in
