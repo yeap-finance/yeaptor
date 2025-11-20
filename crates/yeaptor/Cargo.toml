@@ -6,11 +6,11 @@ build = "build.rs"
 
 [dependencies]
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
-aptos = { git = "https://github.com/aptos-labs/aptos-core", branch = "mainnet" }
-aptos-cli-common = { git = "https://github.com/aptos-labs/aptos-core", branch = "mainnet" }
-aptos-types = { git = "https://github.com/aptos-labs/aptos-core", branch = "mainnet" }
-aptos-framework = { git = "https://github.com/aptos-labs/aptos-core", branch = "mainnet" }
-move-binary-format = { git = "https://github.com/aptos-labs/aptos-core", branch = "mainnet" }
+aptos = { git = "https://github.com/aptos-labs/aptos-core", branch = "devnet" }
+aptos-cli-common = { git = "https://github.com/aptos-labs/aptos-core", branch = "devnet" }
+aptos-types = { git = "https://github.com/aptos-labs/aptos-core", branch = "devnet" }
+aptos-framework = { git = "https://github.com/aptos-labs/aptos-core", branch = "devnet" }
+move-binary-format = { git = "https://github.com/aptos-labs/aptos-core", branch = "devnet" }
 clap = { version = "=4.5.31", features = ["derive"] }
 tokio = { version = "=1.43", features = ["full"] }
 # fix the version to avoid breaking changes
@@ -39,13 +39,14 @@ jemallocator = { version = "0.5.0", features = [
 ] }
 [patch.crates-io]
 merlin = { git = "https://github.com/aptos-labs/merlin" }
+jemalloc-sys = { git = "https://github.com/aptos-labs/jemalloc-sys-shim", rev = "e0920246dd74303fab9a14b990768c6ac990a59b" }
 
 [patch."https://github.com/aptos-labs/aptos-core"]
-aptos = { git = "https://github.com/yeap-finance/aptos-core", branch = "mainnet" }
-aptos-framework = { git = "https://github.com/yeap-finance/aptos-core", branch = "mainnet" }
-aptos-cli-common = { git = "https://github.com/yeap-finance/aptos-core", branch = "mainnet" }
-aptos-types = { git = "https://github.com/yeap-finance/aptos-core", branch = "mainnet" }
-move-binary-format = { git = "https://github.com/yeap-finance/aptos-core", branch = "mainnet" }
+aptos = { git = "https://github.com/yeap-finance/aptos-core", branch = "devnet" }
+aptos-framework = { git = "https://github.com/yeap-finance/aptos-core", branch = "devnet" }
+aptos-cli-common = { git = "https://github.com/yeap-finance/aptos-core", branch = "devnet" }
+aptos-types = { git = "https://github.com/yeap-finance/aptos-core", branch = "devnet" }
+move-binary-format = { git = "https://github.com/yeap-finance/aptos-core", branch = "devnet" }
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }

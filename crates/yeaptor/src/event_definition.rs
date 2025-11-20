@@ -1,10 +1,9 @@
 use aptos_types::account_address::AccountAddress;
 use aptos_types::vm::module_metadata::RuntimeModuleMetadataV1;
 use move_binary_format::CompiledModule;
-#[allow(deprecated)]
-use move_binary_format::normalized::Module;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
+use move_binary_format::views::ModuleView;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EventDefinition {
@@ -24,18 +23,18 @@ pub(crate) fn extract_event_definitions(
     }
     let metadata = metadata.unwrap();
     let events = extract_event_metadata(&metadata);
-    let view = Module::new(module).unwrap();
 
-    view.structs
-        .iter()
-        .filter(|(s, _)| events.contains(s.as_str()))
-        .map(|(name, s)| {
+    let view = ModuleView::new(module);
+
+    view.structs()
+
+        .filter(|s| events.contains(s.name().as_str()))
+        .map(|s| {
             let fields = s
-                .fields
-                .iter()
-                .map(|f| (f.name.to_string(), f.type_.to_string()))
-                .collect::<BTreeMap<_, _>>();
-            (name.to_string(), fields)
+                .fields().map(|f|
+                f.map(|f| (f.name().to_string(), format!("{:?}", f.signature_token()).to_lowercase()))
+                .collect::<BTreeMap<_, _>>());
+            (s.name().to_string(), fields.unwrap_or_default())
         })
         .collect::<BTreeMap<_, _>>()
 }
